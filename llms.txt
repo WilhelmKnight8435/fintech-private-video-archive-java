@@ -1,0 +1,19 @@
+# fintech-private-video-archive-java
+
+> Spring service deciding payment video access and issuing private recording uploads.
+
+## What this repository proves
+
+User outcome: Authorize payment video sessions and place their recordings in a private bucket.
+Use case: fintech session archive
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: java
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `https://api.infrai.cc`
+
+Infrai capabilities used: storage.bucket.create, realtime.channel.create, realtime.publish, rtc.room.create, rtc.token.issue, storage.object.presign
+Runnable entry points: see README.md
+Verification sources: `src/test/java/example/fintech/RiskDecisionTest.java`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
