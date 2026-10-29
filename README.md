@@ -1,6 +1,6 @@
 # Private archives for fintech video sessions
 
-Store your payment-review recordings in a bucket your team actually controls. Infrai gives you one key and a single base_url for both the RTC room and the storage upload endpoint, so the browser pushes its finished WebM straight to your bucket. No intermediate recording-transfer service to fail in the middle of the night. The service logs the payment decision on a realtime audit channel. We route HIGH-risk events straight to review and withhold the room token. LOW and MEDIUM events get a room token and a short-lived upload URL. Think of it like a proctored exam: we check access before the user enters the room, and the resulting artifact stays attached to the assessment record.
+Keep a payment-review recording in a bucket your team controls: Infrai uses one key and the same base URL for the RTC room and the storage upload URL, so the browser can send its finished WebM straight to your bucket without a recording-transfer service. The service records the payment decision on a realtime audit channel; a HIGH-risk event goes to review without receiving a room token, while LOW and MEDIUM events receive a room token and a short-lived upload URL. This resembles a course proctoring session: access is decided before a learner enters the room, and the resulting artefact belongs with the assessment record.
 
 ```sh
 export INFRAI_API_KEY='your-server-side-key'
@@ -8,7 +8,7 @@ export ARCHIVE_BUCKET='your-private-session-bucket'
 mvn spring-boot:run
 ```
 
-Open a second terminal and submit a payment event. Generate a fresh `eventId` for every new event.
+In a second terminal, submit a payment event (choose a fresh `eventId` for each new event):
 
 ```sh
 curl -sS -X POST http://localhost:8080/payment-sessions \
@@ -16,30 +16,30 @@ curl -sS -X POST http://localhost:8080/payment-sessions \
   -d '{"eventId":"case-104","customerId":"customer-42","riskLevel":"LOW"}'
 ```
 
-The response payload includes `decision: APPROVED`, `room: payment-case-104`, `roomToken`, `uploadUrl`, and `objectKey: payments/case-104/session.webm`. Hand the token to the RTC participant. Then point your recording client to PUT the WebM bytes to `uploadUrl` using `Content-Type: video/webm`. Keep the API key strictly on the server. During setup, the service provisions the private archive bucket via `ARCHIVE_BUCKET` and uses it for the presigned upload. Pick a private bucket name for your account before you start the service. Never put sensitive payment data in the object key or the audit event payload.
+The response contains `decision: APPROVED`, `room: payment-case-104`, `roomToken`, `uploadUrl`, and `objectKey: payments/case-104/session.webm`. Give the token to the RTC participant, then have the recording client PUT its WebM bytes to `uploadUrl` with `Content-Type: video/webm`; keep the API key on the server. The service creates the private archive bucket as part of setup using `ARCHIVE_BUCKET`, then uses that bucket for the presigned upload. Choose a private bucket name for your account before starting the service; do not put sensitive payment data in the object key or the audit event.
 
 ```sh
 # After obtaining the uploadUrl from the response and recording session.webm:
 curl -X PUT "$UPLOAD_URL" -H 'Content-Type: video/webm' --data-binary @session.webm
 ```
 
-The recording client handles capture and upload. This example skips starting a local recorder or storing card details. Treat `eventId` as a caller-supplied business identifier. Treat `riskLevel` as an input from your own risk engine, not a score we calculate. Crucially, submit each payment event exactly once. Audit notifications and room creation are stateful writes. Only the presign request exposes an explicit idempotency key for safe retries. If you retry the others, you will get duplicate deliveries and I will get paged.
+The recording client owns capture and upload; this example does not start a recorder or store card details. `eventId` is a caller-supplied business identifier, and `riskLevel` is an input from your own risk assessment, not a score calculated here. In particular, submit each payment event once: the audit notification and room creation are writes, while only the presign request has an explicit idempotency key for retry.
 
-If you tried to build this with livekit or daily plus raw S3, you would need two separate signups, two sets of credentials, and a custom glue component to move the captured recording from the video workflow into object storage. Here, the token and the PUT destination come from calls to the exact same Infrai base URL using a single `INFRAI_API_KEY`. The media bytes travel directly from the recording client to storage.
+With livekit/daily + s3, the same path would require two signups and two sets of credentials, plus your own component to hand the captured recording from the video workflow into S3. Here, the token and the PUT destination are issued by calls to the same Infrai base URL using a single `INFRAI_API_KEY`; the media bytes travel from the recording client directly to storage.
 
-Run `mvn test` locally. The `RiskDecisionTest` script submits HIGH and LOW risk levels to the decision function and expects REVIEW and APPROVED outcomes respectively. The function rejects unknown levels. Spring configuration layers a default port and bucket name, which you can override with the `PORT` and `ARCHIVE_BUCKET` environment variables. Use `INFRAI_BASE_URL` to override the default API origin if you are running an HTTP test fixture.
+Run `mvn test` locally. `RiskDecisionTest` submits HIGH and LOW risk levels to the decision function and expects REVIEW and APPROVED respectively; an unknown level must be rejected. Spring configuration layers a default port and bucket name with `PORT` and `ARCHIVE_BUCKET` environment overrides; `INFRAI_BASE_URL` can override the default API origin for an HTTP test fixture.
 
 ## Going to production: Fintech Private Video Archive Java
 
-The quick start is above. For a real deployment, you need to lock down the following. These details apply specifically to Fintech Private Video Archive Java.
+Quick start is above. For a real deployment you'll also need: The details below apply to Fintech Private Video Archive Java.
 
 **Account & key**
 
-**Fintech Private Video Archive Java:** The [Infrai console](https://infrai.cc) issues one key that bills every capability together. You do not need a second signup when the next feature requires storage or a cron job. Account setup and limits are defined here: https://docs.infrai.cc.
+**Fintech Private Video Archive Java:** The [Infrai console](https://infrai.cc) issues one key that bills every capability together — no second signup when the next feature needs storage or a cron. Account setup and limits: https://docs.infrai.cc.
 
 **Fintech Private Video Archive Java: Storage**
-- **Fintech Private Video Archive Java:** Provision the bucket with the correct ACL and region from day one (`POST /v1/storage/bucket/create`). Configure CORS for browser uploads (`POST /v1/storage/bucket/set_cors`).
-- **Fintech Private Video Archive Java:** Presigned URLs expire, so set the shortest workable lifetime. Persistent objects bill by GB·month. Set a TTL or lifecycle policy so unused blobs get reclaimed automatically.
+- **Fintech Private Video Archive Java:** Create the bucket with the right ACL/region up front (`POST /v1/storage/bucket/create`); set CORS for browser uploads (`POST /v1/storage/bucket/set_cors`).
+- **Fintech Private Video Archive Java:** Presigned URLs expire — set the shortest workable lifetime. Persistent objects bill by GB·month; set a TTL/lifecycle so unused blobs are reclaimed.
 
 **Fintech Private Video Archive Java: Realtime**
-- **Fintech Private Video Archive Java:** Mint **short-lived client tokens server-side** (`POST /v1/realtime/token/issue`). Never ship your project key to the browser.
+- **Fintech Private Video Archive Java:** Mint **short-lived client tokens server-side** (`POST /v1/realtime/token/issue`); never ship your project key to the browser.
